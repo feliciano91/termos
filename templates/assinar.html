@@ -135,10 +135,26 @@ function salvar() {
             assinatura: assinatura
         })
     })
-    .then(r => r.text())
-    .then(msg => {
-        alert(msg);
-        window.location.href = "/";
+    .then(r => r.json())
+    .then(dados => {
+
+        if (dados.sucesso) {
+
+            alert(dados.mensagem);
+
+            window.location.href =
+                "/baixar_assinado/" + dados.arquivo;
+
+        } else {
+
+            alert("Erro: " + dados.erro);
+
+        }
+
+    })
+    .catch(err => {
+        alert("Erro ao salvar assinatura.");
+        console.error(err);
     });
 
 }
