@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Termos</title>
+
+    <style>
+        body{
+            font-family:Arial;
+            background:#f4f4f4;
+            margin:0;
+            padding:20px;
+        }
+
+        .container{
+            max-width:1200px;
+            margin:auto;
+        }
+
+        .card{
+            background:white;
+            padding:20px;
+            border-radius:10px;
+            box-shadow:0 0 10px rgba(0,0,0,.1);
+        }
+
+        form{
+            display:flex;
+            gap:10px;
+            margin-bottom:20px;
+        }
+
+        input{
+            flex:1;
+            padding:12px;
+            font-size:16px;
+        }
+
+        button{
+            padding:12px 25px;
+            background:#0d6efd;
+            color:white;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+        }
+
+        .sucesso{
+            color:green;
+            margin-bottom:15px;
+        }
+
+        .erro{
+            color:red;
+            margin-bottom:15px;
+        }
+
+        iframe{
+            width:100%;
+            height:800px;
+            border:1px solid #ddd;
+            border-radius:10px;
+        }
+
+        @media(max-width:768px){
+
+            form{
+                flex-direction:column;
+            }
+
+            iframe{
+                height:500px;
+            }
+
+        }
+
+    </style>
+
+</head>
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h2>Consulta de Termos</h2>
+
+        <form method="POST">
+
+            <input
+                type="text"
+                name="numero"
+                placeholder="Digite o número do termo"
+                required>
+
+            <button type="submit">
+                Localizar
+            </button>
+
+        </form>
+
+        {% if mensagem %}
+            <div class="erro">
+                {{ mensagem }}
+            </div>
+        {% endif %}
+
+        {% if arquivo %}
+
+        <h3>Arquivo encontrado: {{ arquivo }}</h3>
+
+        <a href="{{ url_for('pagina_assinar', arquivo=arquivo) }}"
+        style="display:inline-block;
+                background:#198754;
+                color:white;
+                padding:12px 20px;
+                text-decoration:none;
+                border-radius:5px;
+                font-weight:bold;
+                margin-bottom:15px;">
+            ✍ Assinar Documento
+        </a>
+
+        <br><br>
+
+        <iframe
+            src="{{ url_for('pdf', arquivo=arquivo) }}"
+            width="100%"
+            height="800">
+        </iframe>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>
