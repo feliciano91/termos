@@ -122,13 +122,31 @@ def salvar_assinatura(arquivo):
             caminho_png
         )
 
-        return "Documento assinado com sucesso!"
+        return {
+            "sucesso": True,
+            "arquivo": arquivo,
+            "mensagem": "Documento assinado com sucesso!"
+        }
 
     except Exception as e:
         print("ERRO:", e)
-        return str(e), 500
+        return {
+            "sucesso": False,
+            "erro": str(e)
+        }, 500
 
-    
+@app.route("/baixar_assinado/<arquivo>")
+def baixar_assinado(arquivo):
+
+    caminho = os.path.join(
+        "termos_assinados",
+        arquivo
+    )
+
+    return send_file(
+        caminho,
+        as_attachment=True
+    )
 
 #if __name__ == "__main__":
     #app.run(debug=True)
