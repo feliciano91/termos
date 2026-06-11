@@ -148,6 +148,10 @@ def baixar_assinado(arquivo):
         as_attachment=True
     )
 
+@app.route("/auth/callback")
+def callback():
+    return "Microsoft login retornou aqui"
+
 #if __name__ == "__main__":
     #app.run(debug=True)
 if __name__ == "__main__":
