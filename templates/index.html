@@ -91,7 +91,7 @@
             <input
                 type="text"
                 name="numero"
-                placeholder="Digite os 6 primeiros dígitos do CPF"
+                placeholder="Digite o número do termo"
                 required>
 
             <button type="submit">
@@ -108,9 +108,10 @@
 
         {% if arquivo %}
 
-        <h3>Arquivo encontrado: {{ arquivo }}</h3>
+        <h3>Arquivo encontrado: {{ arquivo.name }}</h3>
 
-        <a href="{{ url_for('pagina_assinar', arquivo=arquivo) }}"
+        
+        <a href="/assinar/{{ arquivo.id }}" class="btn btn-success"
         style="display:inline-block;
                 background:#198754;
                 color:white;
@@ -119,13 +120,14 @@
                 border-radius:5px;
                 font-weight:bold;
                 margin-bottom:15px;">
-            ✍ Assinar Documento
+            
+            ✍️ Assinar Documento
         </a>
 
         <br><br>
 
         <iframe
-            src="{{ url_for('pdf', arquivo=arquivo) }}"
+            src="{{ url_for('pdf', item_id=arquivo.id) }}"
             width="100%"
             height="800">
         </iframe>
