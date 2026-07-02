@@ -2,8 +2,10 @@ from flask import Flask, render_template, request, send_file, redirect, session
 from datetime import datetime
 from urllib.parse import urlencode
 from dotenv import load_dotenv
+from flask import Response
+from flask import jsonify
 import base64
-import fitz  # PyMuPDF
+import fitz
 import os
 import requests
 
@@ -19,7 +21,9 @@ CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 TENANT_ID = os.getenv("TENANT_ID")
 REDIRECT_URI = os.getenv("REDIRECT_URI")
 
-PASTA_TERMOS = "termos"
+
+
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -37,161 +41,276 @@ def index():
         else:
 
             # Procurar arquivo que comece com os 6 dígitos
-            for nome_arquivo in os.listdir(PASTA_TERMOS):
-
-                if (
-                    nome_arquivo.lower().endswith(".pdf")
-                    and nome_arquivo.startswith(numero)
-                ):
-                    arquivo = nome_arquivo
+            arquivo = None
+            for item in listar_documentos():
+                if item["name"].startswith(numero):
+                    arquivo = item
                     break
 
             if not arquivo:
                 mensagem = "Arquivo não encontrado."
+
 
     return render_template(
         "index.html",
         arquivo=arquivo,
         mensagem=mensagem
     )
-@app.route("/login")
-def login():
-    auth_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/authorize"
 
-    params = {
-        "client_id": CLIENT_ID,
-        "response_type": "code",
-        "redirect_uri": REDIRECT_URI,
-        "response_mode": "query",
-        "scope": "https://graph.microsoft.com/Files.ReadWrite.All offline_access",
+
+@app.route("/descobrir_site")
+def descobrir_site():
+
+    token = obter_token_graph()
+
+    headers = {
+        "Authorization": f"Bearer {token}"
     }
 
-    return redirect(auth_url + "?" + urlencode(params))
+    url = (
+        "https://graph.microsoft.com/v1.0/"
+        "sites/rlconstrucoes.sharepoint.com:/sites/RLConstrues"
+    )
 
-@app.route("/auth/callback")
-def callback():
-    code = request.args.get("code")
+    r = requests.get(url, headers=headers)
 
-    token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
+    return r.json()
+
+@app.route("/descobrir_drive")
+def descobrir_drive():
+
+    token = obter_token_graph()
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    site_id = "rlconstrucoes.sharepoint.com,f208e3bf-de95-4ec6-9bea-f79c617a1dfc,6d73ca91-ee0b-4145-ad21-787602630398"
+
+    url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
+
+    r = requests.get(url, headers=headers)
+
+    return r.json()
+
+@app.route("/listar_assinaturas")
+def listar_assinaturas():
+
+    token = obter_token_graph()
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    # Descobre o drive automaticamente
+    site_id = "rlconstrucoes.sharepoint.com,f208e3bf-de95-4ec6-9bea-f79c617a1dfc,6d73ca91-ee0b-4145-ad21-787602630398"
+
+    r = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive",
+        headers=headers
+    )
+
+    drive = r.json()
+
+    drive_id = drive["id"]
+
+    # Lista a pasta Assinaturas1
+    r = requests.get(
+        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/Assinaturas1:/children",
+        headers=headers
+    )
+
+    return r.json()
+
+
+
+def listar_documentos():
+    
+    token = obter_token_graph()
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    drive_id = "b!v-MI8pXexk6b6vecYXod_JHKc20L7kVBrSF4dgJjA5j6HX8lOL6OR4jJrnXvXG4H"
+
+    url = (
+        f"https://graph.microsoft.com/v1.0/"
+        f"drives/{drive_id}/root:/Assinaturas1/Documentos:/children"
+    )
+
+    r = requests.get(url, headers=headers)
+
+    r.raise_for_status()
+
+    return r.json()["value"]
+
+def obter_item(item_id):
+    
+    token = obter_token_graph()
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    drive_id = "b!v-MI8pXexk6b6vecYXod_JHKc20L7kVBrSF4dgJjA5j6HX8lOL6OR4jJrnXvXG4H"
+
+    r = requests.get(
+        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}",
+        headers=headers
+    )
+
+    r.raise_for_status()
+
+    return r.json()
+
+
+def baixar_pdf(item_id):
+    
+    token = obter_token_graph()
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    drive_id = "b!v-MI8pXexk6b6vecYXod_JHKc20L7kVBrSF4dgJjA5j6HX8lOL6OR4jJrnXvXG4H"
+
+    url = (
+        f"https://graph.microsoft.com/v1.0/"
+        f"drives/{drive_id}/items/{item_id}/content"
+    )
+
+    r = requests.get(url, headers=headers)
+
+    r.raise_for_status()
+
+    return r.content
+
+
+@app.route("/pdf/<item_id>")
+def pdf(item_id):
+
+    pdf = baixar_pdf(item_id)
+
+    return Response(
+        pdf,
+        mimetype="application/pdf"
+    )
+
+
+@app.route("/assinar/<item_id>")
+def pagina_assinar(item_id):
+    return render_template(
+        "assinar.html",
+        item_id=item_id
+    )
+
+
+def inserir_assinatura_pdf(pdf_bytes, assinatura_png):
+    
+    doc = fitz.open(
+        stream=pdf_bytes,
+        filetype="pdf"
+    )
+
+    pagina = doc[2]
+
+    area = fitz.Rect(200,340,400,440)
+
+    pagina.insert_image(area, filename=assinatura_png)
+
+    pdf_assinado = doc.tobytes()
+
+    doc.close()
+
+    return pdf_assinado
+
+
+
+def enviar_pdf(nome, pdf):
+    
+    token = obter_token_graph()
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":"application/pdf"
+    }
+
+    drive_id = "b!v-MI8pXexk6b6vecYXod_JHKc20L7kVBrSF4dgJjA5j6HX8lOL6OR4jJrnXvXG4H"
+
+    url = (
+        f"https://graph.microsoft.com/v1.0/"
+        f"drives/{drive_id}"
+        f"/root:/Assinaturas1/Assinados/{nome}:/content"
+    )
+
+    r = requests.put(
+        url,
+        headers=headers,
+        data=pdf
+    )
+
+    r.raise_for_status()
+
+
+def obter_token_graph():
+    
+    url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
 
     data = {
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
-        "code": code,
-        "grant_type": "authorization_code",
-        "redirect_uri": REDIRECT_URI,
-        "scope": "https://graph.microsoft.com/Files.ReadWrite.All offline_access",
+        "grant_type": "client_credentials",
+        "scope": "https://graph.microsoft.com/.default"
     }
 
-    r = requests.post(token_url, data=data)
-    token_data = r.json()
+    r = requests.post(url, data=data)
 
-    session["access_token"] = token_data.get("access_token")
+    print("STATUS:", r.status_code)
+    print("RESPOSTA:", r.text)
 
-    return "Login Microsoft OK!"
+    r.raise_for_status()
+
+    return r.json()["access_token"]
 
 
-@app.route("/upload-test")
-def upload_test():
-    token = session.get("access_token")
+@app.route("/salvar_assinatura/<item_id>", methods=["POST"])
+def salvar_assinatura(item_id):
 
-    if not token:
-        return redirect("/login")
+    dados = request.get_json()
 
-    file_content = b"Arquivo de teste"
+    assinatura = dados["assinatura"]
 
-    url = "https://graph.microsoft.com/v1.0/drive/root:/teste.txt:/content"
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "text/plain"
-    }
-
-    r = requests.put(url, headers=headers, data=file_content)
-
-    return r.json()
-
-@app.route("/pdf/<path:arquivo>")
-def pdf(arquivo):
-
-    caminho = os.path.join(PASTA_TERMOS, arquivo)
-
-    return send_file(
-        caminho,
-        mimetype="application/pdf",
-        as_attachment=False
+    assinatura = assinatura.replace(
+        "data:image/png;base64,", ""
     )
 
-@app.route("/assinar/<arquivo>")
-def pagina_assinar(arquivo):
-    return render_template("assinar.html", arquivo=arquivo)
+    imagem = base64.b64decode(assinatura)
 
+    nome_png = "assinatura.png"
 
+    with open(nome_png,"wb") as f:
+        f.write(imagem)
 
-def inserir_assinatura_pdf(arquivo_pdf, assinatura_png):
-    
-    pdf_original = os.path.join("termos", arquivo_pdf)
+    pdf = baixar_pdf(item_id)
 
-    if not os.path.exists(pdf_original):
-        return "PDF não encontrado", 404
+    pdf_assinado = inserir_assinatura_pdf(
+        pdf,
+        nome_png
+    )
 
-    os.makedirs("termos_assinados", exist_ok=True)
+    item = obter_item(item_id)
 
-    pdf_saida = os.path.join("termos_assinados", arquivo_pdf)
+    enviar_pdf(
+        item["name"],
+        pdf_assinado
+    )
 
-    doc = fitz.open(pdf_original)
+    return jsonify({
+        "mensagem": "Documento assinado com sucesso!"
+    })
 
-    pagina = doc[2]  # FIX
-
-    area_assinatura = fitz.Rect(200, 80, 350, 700)
-
-    pagina.insert_image(area_assinatura, filename=assinatura_png)
-
-    doc.save(pdf_saida)
-    doc.close()
-
-    print("PDF ASSINADO GERADO:", pdf_saida)
-
-
-@app.route("/salvar_assinatura/<arquivo>", methods=["POST"])
-def salvar_assinatura(arquivo):
-
-    try:
-        dados = request.get_json()
-        assinatura = dados["assinatura"]
-
-        assinatura = assinatura.replace("data:image/png;base64,", "")
-        imagem = base64.b64decode(assinatura)
-
-        os.makedirs("assinaturas", exist_ok=True)
-
-        caminho_png = os.path.join("assinaturas", "assinatura.png")
-
-        with open(caminho_png, "wb") as f:
-            f.write(imagem)
-
-        # gera PDF assinado
-        inserir_assinatura_pdf(arquivo, caminho_png)
-
-        caminho_pdf = os.path.join("termos_assinados", arquivo)
-
-        # 🔥 UPLOAD PARA ONEDRIVE
-        token = session.get("access_token")
-
-        if token:
-            upload_onedrive(token, caminho_pdf, arquivo)
-
-        return {
-            "sucesso": True,
-            "arquivo": arquivo,
-            "onedrive": "enviado"
-        }
-
-    except Exception as e:
-        print("ERRO:", e)
-        return str(e), 500
-    
-    
+ 
 @app.route("/baixar_assinado/<arquivo>")
 def baixar_assinado(arquivo):
 
@@ -205,8 +324,28 @@ def baixar_assinado(arquivo):
         as_attachment=True
     )
 
+def criar_pasta_onedrive(token):
+    url = "https://graph.microsoft.com/v1.0/drive/root/children"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "name": "assinaturas",
+        "folder": {},
+        "@microsoft.graph.conflictBehavior": "fail"
+    }
+
+    requests.post(url, headers=headers, json=data)
+
 def upload_onedrive(token, caminho_arquivo, nome_arquivo):
-    url = f"https://graph.microsoft.com/v1.0/drive/root:/assinaturas/{nome_arquivo}:/content"
+    
+    url = (
+        f"https://graph.microsoft.com/v1.0/"
+        f"drive/root:/assinaturas/{nome_arquivo}:/content"
+    )
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -214,12 +353,32 @@ def upload_onedrive(token, caminho_arquivo, nome_arquivo):
     }
 
     with open(caminho_arquivo, "rb") as f:
-        response = requests.put(url, headers=headers, data=f)
+        r = requests.put(
+            url,
+            headers=headers,
+            data=f
+        )
 
-    return response.json()
-    
+    print(r.status_code)
+    print(r.text)
+
+    r.raise_for_status()
+
+    return r.json()
+
+    resultado = upload_onedrive(
+        token,
+        caminho_pdf,
+        arquivo
+    )
+
+    print("UPLOAD OK")
+    print(resultado)
 
 #if __name__ == "__main__":
     #app.run(debug=True)
+
+
 if __name__ == "__main__":
+    print(app.url_map)
     app.run(host="0.0.0.0", port=5000)
