@@ -12,11 +12,12 @@ import requests
 
 load_dotenv()
 
-print("CLIENT_ID =", os.getenv("CLIENT_ID"))
-print("TENANT_ID =", os.getenv("TENANT_ID"))
-print("CLIENT_SECRET =", "OK" if os.getenv("CLIENT_SECRET") else "AUSENTE")
-print("SECRET_KEY =", "OK" if os.getenv("SECRET_KEY") else "AUSENTE")
-
+print("=" * 40)
+print("CLIENT_ID:", os.getenv("CLIENT_ID"))
+print("TENANT_ID:", os.getenv("TENANT_ID"))
+print("CLIENT_SECRET:", "OK" if os.getenv("CLIENT_SECRET") else "AUSENTE")
+print("REDIRECT_URI:", os.getenv("REDIRECT_URI"))
+print("=" * 40)
 
 app = Flask(__name__)
 
