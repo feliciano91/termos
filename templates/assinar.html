@@ -126,7 +126,7 @@ function salvar() {
 
     const assinatura = canvas.toDataURL("image/png");
 
-    fetch("/salvar_assinatura/{{ arquivo }}", {
+    fetch("/salvar_assinatura/{{ item_id }}", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -136,27 +136,10 @@ function salvar() {
         })
     })
     .then(r => r.json())
-    .then(dados => {
-
-        if (dados.sucesso) {
-
-            alert(dados.mensagem);
-
-            window.location.href =
-                "/baixar_assinado/" + dados.arquivo;
-
-        } else {
-
-            alert("Erro: " + dados.erro);
-
-        }
-
-    })
-    .catch(err => {
-        alert("Erro ao salvar assinatura.");
-        console.error(err);
+    .then(r => {
+        alert(r.mensagem);
+        window.location.href = "/";
     });
-
 }
 
 </script>
