@@ -378,6 +378,10 @@ def upload_onedrive(token, caminho_arquivo, nome_arquivo):
 #if __name__ == "__main__":
     #app.run(debug=True)
 
+print("CLIENT_ID:", CLIENT_ID)
+print("TENANT_ID:", TENANT_ID)
+print("CLIENT_SECRET:", "OK" if CLIENT_SECRET else "NÃO ENCONTRADO")
+
 
 if __name__ == "__main__":
     print(app.url_map)
